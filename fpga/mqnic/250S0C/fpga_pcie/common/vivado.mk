@@ -86,7 +86,7 @@ create_project.tcl: Makefile $(XCI_FILES_REL) $(IP_TCL_FILES_REL)
 	echo "add_files -fileset sources_1 defines.v $(SYN_FILES_REL)" >> $@
 	echo "add_files -fileset constrs_1 $(XDC_FILES_REL)" >> $@
 	echo "update_compile_order -fileset sources_1" >> $@
-	echo "set_property  ip_repo_paths  {/home/hemanthr/corundum_copy/fpga/mqnic/250S0C/fpga_pcie/ip_repo/axilite_2_pcie /home/hemanthr/corundum_copy/fpga/mqnic/250S0C/fpga_pcie/ip_repo/pcie2axilite_bridge} [current_project]" >> $@
+	echo "set_property  ip_repo_paths  {/home/hemanthr/corundum/fpga/mqnic/250S0C/fpga_pcie/ip_repo/axilite_2_pcie /home/hemanthr/corundum/fpga/mqnic/250S0C/fpga_pcie/ip_repo/pcie2axilite_bridge} [current_project]" >> $@
 	echo "update_ip_catalog" >> $@
 	for x in $(XCI_FILES_REL); do echo "import_ip $$x" >> $@; done
 	for x in $(IP_TCL_FILES_REL); do echo "source $$x" >> $@; done
@@ -120,7 +120,7 @@ $(FPGA_TOP).xpr: create_project.tcl update_config.tcl
 	echo "open_project $*.xpr" > generate_bit.tcl
 	echo "open_run impl_1" >> generate_bit.tcl
 	echo "write_bitstream -force $*.bit" >> generate_bit.tcl
-	echo "write_hw_platform -fixed -include_bit -force -file /home/hemanthr/corundum/fpga/mqnic/250_SoC/fpga_25g/fpga/fpga.xsa"  >> generate_bit.tcl
+	#echo "write_hw_platform -fixed -include_bit -force -file /home/hemanthr/corundum/fpga/mqnic/250S0C/fpga_pcie/fpga/fpga.xsa"  >> generate_bit.tcl
 	vivado -nojournal -nolog -mode batch -source generate_bit.tcl
 	mkdir -p rev
 	EXT=bit; COUNT=100; \

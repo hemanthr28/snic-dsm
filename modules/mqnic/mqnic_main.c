@@ -43,7 +43,7 @@
 #endif
 
 MODULE_DESCRIPTION("mqnic driver");
-MODULE_AUTHOR("Alex Forencich");
+MODULE_AUTHOR("Alex Forencich & Hemanth Ramesh");
 MODULE_LICENSE("Dual BSD/GPL");
 MODULE_VERSION(DRIVER_VERSION);
 
@@ -51,8 +51,9 @@ unsigned int mqnic_num_ev_queue_entries = 1024;
 unsigned int mqnic_num_tx_queue_entries = 1024;
 unsigned int mqnic_num_rx_queue_entries = 1024;
 
-/*Zynq related variables*/
-size_t size = 1024*4096;
+/*Start of Popcorn changes*/
+size_t size = 1024;
+/*End of Popcorn changes*/
 
 module_param_named(num_ev_queue_entries, mqnic_num_ev_queue_entries, uint, 0444);
 MODULE_PARM_DESC(num_ev_queue_entries, "number of entries to allocate per event queue (default: 1024)");
@@ -240,6 +241,7 @@ static int mqnic_pci_probe(struct pci_dev *pdev, const struct pci_device_id *ent
 	struct mqnic_dev *mqnic;
 	struct device *dev = &pdev->dev;
 
+	WARN_ON(true);
 	dev_info(dev, DRIVER_NAME " PCI probe");
 	dev_info(dev, " Vendor: 0x%04x", pdev->vendor);
 	dev_info(dev, " Device: 0x%04x", pdev->device);
@@ -325,8 +327,9 @@ static int mqnic_pci_probe(struct pci_dev *pdev, const struct pci_device_id *ent
 	}
 
 	/*This section allocated a chunk of memory and gets its physical addr*/
-	
-	pa_ptr = (void*) kmalloc(size, GFP_DMA); //| GFP_DMA32);
+	//devm_kzalloc
+
+	pa_ptr = (void*) devm_kzalloc(dev, size, GFP_USER); //GFP_USER | GFP_DMA32);
 	if (!pa_ptr)
 		return -ENOMEM;
 	else
@@ -334,8 +337,8 @@ static int mqnic_pci_probe(struct pci_dev *pdev, const struct pci_device_id *ent
 	
 	mqnic->hw_regs_size = pci_resource_len(pdev, 0);
 	mqnic->hw_regs_phys = pci_resource_start(pdev, 0);
-	mqnic->zynq_hw_regs_size = pci_resource_len(pdev, 2);
-	mqnic->zynq_hw_regs_phys = pci_resource_start(pdev, 2);
+	//mqnic->zynq_hw_regs_size = pci_resource_len(pdev, 2);
+	//mqnic->zynq_hw_regs_phys = pci_resource_start(pdev, 2);
 	mqnic->app_hw_regs_size = pci_resource_len(pdev, 4);
 	mqnic->app_hw_regs_phys = pci_resource_start(pdev, 4);
 	mqnic->ram_hw_regs_size = pci_resource_len(pdev, 5);
@@ -350,6 +353,7 @@ static int mqnic_pci_probe(struct pci_dev *pdev, const struct pci_device_id *ent
 		goto fail_map_bars;
 	}
 
+	/*
 	if (mqnic->zynq_hw_regs_size) {
 		dev_info(dev, "Zynq BAR size: %llu", mqnic->zynq_hw_regs_size);
 		mqnic->zynq_hw_addr = pci_ioremap_bar(pdev, 2);
@@ -359,12 +363,13 @@ static int mqnic_pci_probe(struct pci_dev *pdev, const struct pci_device_id *ent
 			goto fail_map_bars;
 		}
 	}
-
+	*/
 	/*Write the physical address to the zynq ram and the read the address.
 	  This address is used by Zynq to issue memory read and write operations*/
 	//iowrite32(virt_to_phys(pa_ptr), mqnic->zynq_hw_addr);
 	//ioread32(mqnic->zynq_hw_addr);
 	//printk("Phy address read: 0x%x\n", ioread32(mqnic->zynq_hw_addr));
+	//writeq(virt_to_phys(pa_ptr), mqnic->zynq_hw_addr);
 
 	if (mqnic->app_hw_regs_size) {
 		dev_info(dev, "Application BAR size: %llu", mqnic->app_hw_regs_size);
@@ -419,8 +424,8 @@ fail_reset:
 fail_map_bars:
 	if (mqnic->hw_addr)
 		pci_iounmap(pdev, mqnic->hw_addr);
-	if (mqnic->zynq_hw_addr)
-		pci_iounmap(pdev, mqnic->zynq_hw_addr);
+	/*if (mqnic->zynq_hw_addr)
+		pci_iounmap(pdev, mqnic->zynq_hw_addr);*/
 	if (mqnic->app_hw_addr)
 		pci_iounmap(pdev, mqnic->app_hw_addr);
 	if (mqnic->ram_hw_addr)
@@ -445,6 +450,8 @@ static void mqnic_pci_remove(struct pci_dev *pdev)
 	mqnic_irq_deinit_pcie(mqnic);
 	if (mqnic->hw_addr)
 		pci_iounmap(pdev, mqnic->hw_addr);
+	/*if (mqnic->zynq_hw_addr)
+		pci_iounmap(pdev, mqnic->zynq_hw_addr);*/
 	if (mqnic->app_hw_addr)
 		pci_iounmap(pdev, mqnic->app_hw_addr);
 	if (mqnic->ram_hw_addr)
@@ -452,7 +459,7 @@ static void mqnic_pci_remove(struct pci_dev *pdev)
 	pci_release_regions(pdev);
 	pci_disable_device(pdev);
 	mqnic_free_id(mqnic);
-	kfree(pa_ptr);
+	//kfree(pa_ptr);
 }
 
 static void mqnic_pci_shutdown(struct pci_dev *pdev)
@@ -473,6 +480,7 @@ static struct pci_driver mqnic_pci_driver = {
 static int __init mqnic_init(void)
 {
 	return pci_register_driver(&mqnic_pci_driver);
+
 }
 
 static void __exit mqnic_exit(void)

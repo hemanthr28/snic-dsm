@@ -59,7 +59,7 @@ module pcie_2_axilite # (
   input                                 s_axis_cq_tvalid,
   output   [21:0]                       s_axis_cq_tready,
 
-  output  [2*AXIS_TDATA_WIDTH-1:0]        m_axis_cc_tdata,
+  output  [2*AXIS_TDATA_WIDTH-1:0]      m_axis_cc_tdata,
   output  [80:0]                        m_axis_cc_tuser,
   output                                m_axis_cc_tlast,
   output  [8*AXIS_TDATA_WIDTH/32-1:0]   m_axis_cc_tkeep,
@@ -114,12 +114,12 @@ module pcie_2_axilite # (
   output                                 s_axi_rvalid,
   input                                  s_axi_rready, 
   
-  output [511:0]                        cc_tdata_out,
-  output wire                           zynq_cc_actv
-  
+  output [511:0]                        cq_tdata_out, //first write opearation contains address of the x86 receive Q
+  output                                cq_actv,
+  input [511:0]                         rq_tdata_in, //first write operation contains address of the ARM receive Q
+  input                                 rq_actv,
+  output [63:0]                         phy_addr_rq
   );
- 
-  //localparam  OUTSTANDING_READS           = 5;
   
   localparam BAR0SIZE_INT                 = get_size( BAR0SIZE );
   localparam BAR1SIZE_INT                 = get_size( BAR1SIZE );
@@ -131,38 +131,38 @@ module pcie_2_axilite # (
 //Wire Declarations
 
 //TLP Information to AXI 
-wire        mem_req_valid;
-wire        mem_req_ready;
-wire [2:0]  mem_req_bar_hit;
-wire [48:0] mem_req_pcie_address;
-wire [7:0]  mem_req_byte_enable;
-wire        mem_req_write_readn;
-wire        mem_req_phys_func;
-wire [63:0] mem_req_write_data;//
+  wire        mem_req_valid;
+  wire        mem_req_ready;
+  wire [2:0]  mem_req_bar_hit;
+  wire [48:0] mem_req_pcie_address;
+  wire [7:0]  mem_req_byte_enable;
+  wire        mem_req_write_readn;
+  wire        mem_req_phys_func;
+  wire [63:0] mem_req_write_data;//
  
-wire        tag_mang_write_en;              
+  wire        tag_mang_write_en;              
  
-wire [2:0]  tag_mang_tc_wr;   
-wire [2:0]  tag_mang_attr_wr;   
-wire [15:0] tag_mang_requester_id_wr;   
-wire [6:0]  tag_mang_lower_addr_wr;     
-wire        tag_mang_completer_func_wr; 
-wire [7:0]  tag_mang_tag_wr;            
-wire [3:0]  tag_mang_first_be_wr; 
+  wire [2:0]  tag_mang_tc_wr;   
+  wire [2:0]  tag_mang_attr_wr;   
+  wire [15:0] tag_mang_requester_id_wr;   
+  wire [6:0]  tag_mang_lower_addr_wr;     
+  wire        tag_mang_completer_func_wr; 
+  wire [7:0]  tag_mang_tag_wr;            
+  wire [3:0]  tag_mang_first_be_wr; 
 
-wire        tag_mang_read_en;
+  wire        tag_mang_read_en;
 
-wire [2:0]  tag_mang_tc_rd;   
-wire [2:0]  tag_mang_attr_rd;   
-wire [15:0] tag_mang_requester_id_rd;   
-wire [6:0]  tag_mang_lower_addr_rd;     
-wire        tag_mang_completer_func_rd; 
-wire [7:0]  tag_mang_tag_rd;            
-wire [7:0]  tag_mang_first_be_rd; 
+  wire [2:0]  tag_mang_tc_rd;   
+  wire [2:0]  tag_mang_attr_rd;   
+  wire [15:0] tag_mang_requester_id_rd;   
+  wire [6:0]  tag_mang_lower_addr_rd;     
+  wire        tag_mang_completer_func_rd; 
+  wire [7:0]  tag_mang_tag_rd;            
+  wire [7:0]  tag_mang_first_be_rd; 
 
-wire        axi_cpld_valid;
-wire        axi_cpld_ready;
-wire [63:0] axi_cpld_data;
+  wire        axi_cpld_valid;
+  wire        axi_cpld_ready;
+  wire [63:0] axi_cpld_data;
 
   wire               completion_ur_req;
   wire [7:0]         completion_ur_tag;
@@ -178,7 +178,25 @@ wire [63:0] axi_cpld_data;
   (* ASYNC_REG="TRUE" *) 
   reg [STAGES-1:0]   axi_sreset   = {STAGES{1'b0}};
   wire               axi_sresetn;
-  
+  reg                cnt          = 1'b0;
+  reg [63:0]         phy_addr     = 64'd0;
+
+assign phy_addr_rq = phy_addr;
+
+
+always @(posedge axi_clk) begin
+   if(!axi_aresetn) begin
+        phy_addr[63:0] <= 'b0;
+            cnt <= 'b0;
+   end
+   if(rq_actv && rq_tdata_in[191:128] != 64'hfefefefe && cnt != 1'b1) begin //&& rq_tdata_in[63:0] == 'h0
+            phy_addr[63:0] <= rq_tdata_in[191:128];
+            cnt <= 1'b1;
+   end
+   else if(rq_actv && rq_tdata_in[191:128] == 64'hfefefefe) begin //&& rq_tdata_in[63:0] == 'h0
+        cnt <= 'b0;
+   end
+end
 
   always @(posedge axi_clk or negedge axi_aresetn) begin
     if ( !axi_aresetn ) begin
@@ -190,8 +208,8 @@ wire [63:0] axi_cpld_data;
   
   assign axi_sresetn = ~axi_sreset[STAGES-1];           
   
-  assign cc_tdata_out = m_axis_cc_tdata;
-  assign zynq_cc_actv = m_axis_cc_tvalid;
+  assign cq_tdata_out = s_axis_cq_tdata;
+  assign cq_actv = s_axis_cq_tlast;
   
   saxis_controller # ( 
   	.S_AXIS_TDATA_WIDTH( AXIS_TDATA_WIDTH )
@@ -206,7 +224,7 @@ wire [63:0] axi_cpld_data;
     .s_axis_cq_tkeep                     ( s_axis_cq_tkeep ),
     .s_axis_cq_tvalid                    ( s_axis_cq_tvalid ),
     .s_axis_cq_tready                    ( s_axis_cq_tready ),
-    
+
     //TLP Information to AXI 
     .mem_req_valid                       ( mem_req_valid ),
     .mem_req_ready                       ( mem_req_ready ),
@@ -235,7 +253,7 @@ wire [63:0] axi_cpld_data;
     .completion_ur_requester_id          ( completion_ur_requester_id),
     .completion_ur_tc                    ( completion_ur_tc),
     .completion_ur_attr                  ( completion_ur_attr),
-    .completion_ur_done                  ( completion_ur_done) 
+    .completion_ur_done                  ( completion_ur_done)
             
 );
 
@@ -337,7 +355,8 @@ wire [63:0] axi_cpld_data;
     //Completion TLP Info
     .axi_cpld_valid       ( axi_cpld_valid ),
     .axi_cpld_ready       ( axi_cpld_ready ),
-    .axi_cpld_data        ( axi_cpld_data ) 
+    .axi_cpld_data        ( axi_cpld_data ),
+    .phy_addr             (  phy_addr )
     
     );
 

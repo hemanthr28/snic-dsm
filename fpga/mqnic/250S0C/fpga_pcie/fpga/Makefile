@@ -105,6 +105,14 @@ SYN_FILES += lib/pcie/rtl/pcie_us_msi.v
 SYN_FILES += lib/pcie/rtl/pulse_merge.v
 SYN_FILES += lib/pcie/rtl/pcie_us_axis_cq_demux.v
 SYN_FILES += lib/pcie/rtl/pcie_us_axis_rc_demux_mod.v
+SYN_FILES += lib/zynq/axis_aximm_monitor.v
+SYN_FILES += lib/zynq/dsm_axis_aximm.v
+SYN_FILES += lib/zynq/axis_switch.v
+SYN_FILES += lib/zynq/stream_monitor.v
+SYN_FILES += lib/zynq/switch_count.v
+SYN_FILES += ip_repo/protocol_processor_v1_0/protocol_processor_v1_0.vhd
+SYN_FILES += ip_repo/protocol_processor_v1_0/protocol_processor_v1_0_S00_AXI.vhd
+SYN_FILES += ip_repo/protocol_processor_v1_0/prot_processor.v
 
 # XDC files
 XDC_FILES = fpga.xdc

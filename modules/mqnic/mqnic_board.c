@@ -70,7 +70,8 @@ static struct i2c_client *create_i2c_client(struct i2c_adapter *adapter,
 #endif
 	}
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 2, 0)
-	client = i2c_new_client_device(adapter, &board_info);
+	//client = i2c_new_client_device(adapter, &board_info);
+	client = i2c_new_device(adapter, &board_info);
 #else
 	client = i2c_new_device(adapter, &board_info);
 #endif

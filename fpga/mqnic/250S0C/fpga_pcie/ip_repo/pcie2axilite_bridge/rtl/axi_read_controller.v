@@ -66,7 +66,8 @@ module axi_read_controller # (
   //Completion Data Coming back
   output                                axi_cpld_valid,
   input                                 axi_cpld_ready,
-  output [63:0]                         axi_cpld_data 
+  output [63:0]                         axi_cpld_data,
+  input [63:0]                          phy_addr
 
     );
     
@@ -77,8 +78,6 @@ module axi_read_controller # (
     
   localparam IDLE      = 4'b0001;
   localparam READ_REQ = 4'b0010;
-  //localparam <state3> = 4'b0100;
-  //localparam <state4> = 4'b1000;
  
   reg [3:0] aximm_ar_sm = IDLE;
   reg [3:0] aximm_rd_sm = IDLE;
@@ -117,7 +116,7 @@ module axi_read_controller # (
  
   assign m_axi_arvalid  = m_axi_arvalid_r;
   assign m_axi_arprot   = 0;
-  assign m_axi_araddr   = m_axi_araddr_r;
+  assign m_axi_araddr   = phy_addr[48:0] + {17'h0, m_axi_araddr_r};
   assign mem_req_ready  = mem_req_ready_r;
   
   assign axi_cpld_valid  = m_axi_rvalid;

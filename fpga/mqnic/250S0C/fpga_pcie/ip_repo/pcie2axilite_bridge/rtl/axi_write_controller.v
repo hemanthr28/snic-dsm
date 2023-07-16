@@ -66,8 +66,8 @@ module axi_write_controller# (
   input [7:0]                           mem_req_byte_enable,
   input                                 mem_req_write_readn,
   input                                 mem_req_phys_func,
-  input [63:0]                          mem_req_write_data
-  
+  input [63:0]                          mem_req_write_data,
+  input [63:0]                          phy_addr  
   );
   
   localparam IDLE       = 4'b0001;
@@ -117,7 +117,6 @@ module axi_write_controller# (
               if (m_axi_wready) begin 
                 aximm_wr_sm    <= #TCQ WAIT_ACK;
                 m_axi_wvalid_r <= #TCQ 1'b0;
-                //mem_req_ready_r <= #TCQ 1'b1; //Bug from 1.0
               end 
            end
 	         WAIT_ACK : begin
@@ -134,7 +133,7 @@ module axi_write_controller# (
         
   assign mem_req_ready = mem_req_ready_r;      
   
-  assign m_axi_awaddr  = m_axi_addr_c;
+  assign m_axi_awaddr  = phy_addr[48:0] + m_axi_addr_c;
   assign m_axi_awprot  = 0;
   assign m_axi_awvalid = m_axi_awvalid_r;
         

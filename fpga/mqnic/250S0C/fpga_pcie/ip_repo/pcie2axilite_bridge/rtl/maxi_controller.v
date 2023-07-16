@@ -83,7 +83,8 @@ module maxi_controller # (
   output                                 axi_cpld_valid,
   input                                  axi_cpld_ready,
   output [63:0]                          axi_cpld_data 
-  );
+  input  [63:0]                          phy_addr
+  ); 
   
   wire mem_req_ready_r;
   wire mem_req_ready_w;
@@ -142,7 +143,8 @@ module maxi_controller # (
     //Completion TLP Info
     .axi_cpld_valid       ( axi_cpld_valid ),
     .axi_cpld_ready       ( axi_cpld_ready ),
-    .axi_cpld_data        ( axi_cpld_data )  
+    .axi_cpld_data        ( axi_cpld_data ) ,
+    .phy_addr             ( phy_addr )
   );
 
 
@@ -187,7 +189,8 @@ module maxi_controller # (
     .mem_req_byte_enable  ( mem_req_byte_enable ),
     .mem_req_write_readn  ( mem_req_write_readn ),
     .mem_req_phys_func    ( mem_req_phys_func ),
-    .mem_req_write_data   ( mem_req_write_data )
+    .mem_req_write_data   ( mem_req_write_data ),
+    .phy_addr             ( phy_addr )
 
 );
 

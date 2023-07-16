@@ -64,7 +64,7 @@ module saxis_controller # (
   output [15:0]                        completion_ur_requester_id,
   output [2:0]                         completion_ur_tc,
   output [2:0]                         completion_ur_attr,
-  input                                completion_ur_done      
+  input                                completion_ur_done
   
   );
 
@@ -89,231 +89,34 @@ module saxis_controller # (
    reg                       mem_req_write_readn_r; 
    reg                       mem_read_pulse;
    reg                       s_axis_cq_tready_r;
+   reg                       s1_axis_cq_tready_r;
    reg                       mem_req_valid_r;
 
-   always @(posedge axis_clk)
+always @(posedge axis_clk)
       saxis_sm_r <= saxis_sm;
-
-   generate/*
-      if ( S_AXIS_TDATA_WIDTH == 64 ) begin: S_AXIS_TDATA_WIDTH_64
-
-      always @(posedge axis_clk)
-         if (!axis_aresetn) begin
-            saxis_sm            <= #TCQ IDLE;
-            mem_read_pulse      <= #TCQ 1'b0;
-            s_axis_cq_tready_r  <= #TCQ 1'b0; 
-            mem_req_valid_r     <= #TCQ 1'b0;
-            completion_ur_req     <= #TCQ 1'b0;
+   generate
+   
+       //if (S_AXIS_TDATA_WIDTH == 256) begin: S_AXIS_TDATA_WIDTH_256 // This is going to look similar to the 128-bit interface
+       
+       always @(posedge axis_clk)
+          
+          if (!axis_aresetn) begin
+             saxis_sm            <= #TCQ IDLE;
+             mem_read_pulse      <= #TCQ 1'b0;
+             s_axis_cq_tready_r  <= #TCQ 1'b0;
+             s1_axis_cq_tready_r <= #TCQ 1'b0; 
+             mem_req_valid_r     <= #TCQ 1'b0;
+             completion_ur_req   <= #TCQ 1'b0;    
+             //i <= #TCQ 'b0;   
+             //rd_cntr <= #TCQ 'b0;  
+             //rd_ptr <= #TCQ 'b0;  
+          end
+          else
+             case ( saxis_sm )
             
-         end
-         else
-            case (saxis_sm)
-               IDLE : begin
-                  if (s_axis_cq_tvalid & s_axis_cq_tready[0] ) begin
-                      saxis_sm <= #TCQ DW2_PROCESS_64;
-                      s_axis_cq_tdata_wide_r[63:0] <= #TCQ s_axis_cq_tdata[63:0];  
-                      first_be_r <= #TCQ s_axis_cq_tuser[3:0];
-                  end
-                  s_axis_cq_tready_r <= #TCQ 1'b1;
-                  mem_req_valid_r <= #TCQ 1'b0;
-               end
-               DW2_PROCESS_64 : begin
-                  if (s_axis_cq_tvalid & s_axis_cq_tready[0] ) begin                    
-                    if ( s_axis_cq_tdata[14:11] == 4'h0 ) begin         //If Memory Read
-                      if ( s_axis_cq_tdata[10:0] == 11'd1 ) begin       // Only 1DW Reads are Supported
-                        saxis_sm <= #TCQ READ_PROCESS_64;
-                        mem_req_write_readn_r <= #TCQ 1'b0;
-                        mem_read_pulse <= #TCQ 1'b1;
-                        mem_req_valid_r <= #TCQ 1'b1;
-                        s_axis_cq_tready_r <= #TCQ 1'b0;
-                      end else begin // Only 1DW packets are supported.  Larger reads will get a completion with UR.
-                        saxis_sm <= #TCQ COMPLETION_UR;
-                        s_axis_cq_tready_r <= #TCQ 1'b0;
-                      end
-                    end else if ( (s_axis_cq_tdata[14:11] == 4'h1) ) begin //If Memory Write
-                      if ( s_axis_cq_tdata[10:0] == 11'd1 ) begin // Only 1DW Reads are Supported
-                        saxis_sm <= #TCQ WRITE_DATA_64;
-                        mem_req_write_readn_r <= #TCQ 1'b1;
-                        mem_req_valid_r <= #TCQ 1'b0;
-                      end else begin // Only 1DW packets are supported.  Larger packets are ignored.
-                        if (s_axis_cq_tlast) begin
-                          saxis_sm <= #TCQ IDLE;
-                        end else begin
-                          saxis_sm <= #TCQ WAIT_FOR_LAST;
-                        end
-                      end
-                    end
-                    s_axis_cq_tdata_wide_r[127:64] <= #TCQ s_axis_cq_tdata[63:0]; 
-                  end 
-               end
-               READ_PROCESS_64 : begin
-                  if (mem_req_ready) begin
-                    saxis_sm <= #TCQ IDLE;
-                    s_axis_cq_tready_r <= #TCQ 1'b1;
-                    mem_req_valid_r <= #TCQ 1'b0;
-                  end else begin
-                    s_axis_cq_tready_r <= #TCQ 1'b0;
-                  end
-                  mem_read_pulse <= #TCQ 1'b0;   
-               end
-               WRITE_DATA_64: begin
-                  if (s_axis_cq_tvalid) begin
-                    s_axis_cq_tdata_wide_r [159:128] = #TCQ s_axis_cq_tdata[31:0];
-                    if (mem_req_ready) begin
-                      saxis_sm <= #TCQ IDLE;
-                      mem_req_valid_r <= #TCQ 1'b1;
-                      s_axis_cq_tready_r <= #TCQ 1'b1; 
-                    end else begin 
-                      s_axis_cq_tready_r <= #TCQ 1'b0;
-                      saxis_sm <= #TCQ HOLD_VALID;  
-                      mem_req_valid_r <= #TCQ 1'b1;                
-                    end
-                  end
-               end
-               WAIT_FOR_LAST: begin
-                 if (s_axis_cq_tlast) begin
-                   saxis_sm <= #TCQ IDLE;
-                 end 
-               end 
-               COMPLETION_UR: begin
-                 if (completion_ur_done) begin
-                   saxis_sm <= #TCQ IDLE;
-                   completion_ur_req <= 1'b0;
-                 end else begin
-                   completion_ur_req <= 1'b1;
-                 end
-               end 
-               HOLD_VALID: begin
-                 if (mem_req_ready) begin
-                   saxis_sm <= #TCQ IDLE;
-                   mem_req_valid_r <= #TCQ 1'b0; 
-                   s_axis_cq_tready_r <= #TCQ 1'b1;
-                 end 
-               end                             
-               default: begin  // Fault Recovery
-                  saxis_sm <= #TCQ IDLE;
-	       end
-         endcase
-         
-       end else if (S_AXIS_TDATA_WIDTH == 128) begin: S_AXIS_TDATA_WIDTH_128
-       
-       always @(posedge axis_clk)
-          if (!axis_aresetn) begin
-             saxis_sm            <= #TCQ IDLE;
-             mem_read_pulse      <= #TCQ 1'b0;
-             s_axis_cq_tready_r  <= #TCQ 1'b0; 
-             mem_req_valid_r     <= #TCQ 1'b0;
-             completion_ur_req   <= #TCQ 1'b0;
-             
-             
-          end
-          else
-             case ( saxis_sm )
-                IDLE : begin
-		   
-                  mem_req_valid_r               <= #TCQ 1'b0;
-		   
-                  if ( s_axis_cq_tvalid & s_axis_cq_tready[0] & (s_axis_cq_tdata[78:75] == 4'h0)  ) begin // If Memory Read
-                    if ( s_axis_cq_tdata[10+64:0+64] == 11'd1 ) begin       // Only 1DW Reads are Supported
-                      saxis_sm                      <= #TCQ READ_PROCESS_128; 
-                      mem_req_write_readn_r         <= #TCQ 1'b0;
-                      mem_read_pulse                <= #TCQ 1'b1;
-                      mem_req_valid_r               <= #TCQ 1'b1;
-                      s_axis_cq_tdata_wide_r[127:0] <= #TCQ s_axis_cq_tdata[127:0]; 
-                      first_be_r                    <= #TCQ s_axis_cq_tuser[3:0];
-                      s_axis_cq_tready_r            <= #TCQ 1'b0;
-                    end else begin
-                      s_axis_cq_tdata_wide_r[127:0] <= #TCQ s_axis_cq_tdata[127:0];
-                      first_be_r                    <= #TCQ s_axis_cq_tuser[3:0];
-                      saxis_sm                      <= #TCQ COMPLETION_UR;
-                      s_axis_cq_tready_r            <= #TCQ 1'b0;
-                    end
-                  end else if (s_axis_cq_tvalid & s_axis_cq_tready[0] & (s_axis_cq_tdata[78:75] == 4'h1)) begin // If Memory Write
-                    if ( s_axis_cq_tdata[10+64:0+64] == 11'd1 ) begin       // Only 1DW Writes are Supported
-                      saxis_sm                      <= #TCQ WRITE_DATA_128;
-                      mem_req_write_readn_r         <= #TCQ 1'b1;
-                      mem_req_valid_r               <= #TCQ 1'b0; 
-                      s_axis_cq_tdata_wide_r[127:0] <= #TCQ s_axis_cq_tdata[127:0]; 
-                      first_be_r                    <= #TCQ s_axis_cq_tuser[3:0]; 
-                      s_axis_cq_tready_r            <= #TCQ 1'b1;  
-                    end else begin
-                      if (s_axis_cq_tlast) begin
-                        saxis_sm <= #TCQ IDLE;
-                      end else begin
-                        saxis_sm <= #TCQ WAIT_FOR_LAST;
-                      end                     
-                    end              
-                  end else begin
-                      s_axis_cq_tready_r            <= #TCQ 1'b1;
-                  end                 
-                end
-                READ_PROCESS_128 : begin
-                  if (mem_req_ready) begin
-                    saxis_sm <= #TCQ IDLE;
-                    s_axis_cq_tready_r <= #TCQ 1'b1;
-                    mem_req_valid_r <= #TCQ 1'b0;
-                  end else begin
-                    s_axis_cq_tready_r <= #TCQ 1'b0;
-                  end
-                    mem_read_pulse <= #TCQ 1'b0;   
-                end
-                WRITE_DATA_128: begin
-                  if (s_axis_cq_tvalid) begin
-                    s_axis_cq_tdata_wide_r [159:128] = #TCQ s_axis_cq_tdata[31:0];
-                    if (mem_req_ready) begin
-                      saxis_sm <= #TCQ IDLE;
-                      mem_req_valid_r    <= #TCQ 1'b1;
-                      s_axis_cq_tready_r <= #TCQ 1'b1; 
-                    end else begin 
-                      s_axis_cq_tready_r <= #TCQ 1'b0;
-                      saxis_sm <= #TCQ HOLD_VALID;  
-                      mem_req_valid_r <= #TCQ 1'b1;                
-                    end
-                  end
-                end
-                WAIT_FOR_LAST: begin
-                  if ( s_axis_cq_tlast ) begin
-                    saxis_sm <= #TCQ IDLE;
-                  end 
-                end 
-                COMPLETION_UR: begin
-                  if ( completion_ur_done ) begin
-                    saxis_sm <= #TCQ IDLE;
-                    completion_ur_req <= 1'b0;
-                  end else begin
-                    completion_ur_req <= 1'b1;
-                  end
-                end 
-                HOLD_VALID: begin
-                  if (mem_req_ready) begin
-                    saxis_sm <= #TCQ IDLE;
-                    mem_req_valid_r <= #TCQ 1'b0; 
-                    s_axis_cq_tready_r <= #TCQ 1'b1;
-                  end 
-                end 
-                default: begin  // Fault Recovery
-                   saxis_sm <= #TCQ IDLE;
-         end
-          endcase    
-                  
-       end */
-       if (S_AXIS_TDATA_WIDTH == 256) begin: S_AXIS_TDATA_WIDTH_256 // This is going to look similar to the 128-bit interface
-       
-       always @(posedge axis_clk)
-          if (!axis_aresetn) begin
-             saxis_sm            <= #TCQ IDLE;
-             mem_read_pulse      <= #TCQ 1'b0;
-             s_axis_cq_tready_r  <= #TCQ 1'b0; 
-             mem_req_valid_r     <= #TCQ 1'b0;
-             completion_ur_req   <= #TCQ 1'b0;
-             
-          end
-          else
-             case ( saxis_sm )
                 IDLE : begin
                   if ( s_axis_cq_tvalid & s_axis_cq_tready[0] & (s_axis_cq_tdata[78:75] == 4'h0) ) begin // If Memory Read
-                    if ( s_axis_cq_tdata[10+64:0+64] == 11'd2 || s_axis_cq_tdata[10+64:0+64] == 11'd1) begin       // Only 1DW Reads are Supported                  
-                    //if ( s_axis_cq_tdata[10+64:0+64] == 11'd1) begin
+                    if ( s_axis_cq_tdata[10+64:0+64] == 11'd2 || s_axis_cq_tdata[10+64:0+64] == 11'd1) begin       // Only 1DW Reads are Supported - This can be enhanced                
                       saxis_sm                      <= #TCQ READ_PROCESS_256; 
                       mem_req_write_readn_r         <= #TCQ 1'b0;
                       mem_read_pulse                <= #TCQ 1'b1;
@@ -322,25 +125,28 @@ module saxis_controller # (
                       first_be_r                    <= #TCQ s_axis_cq_tuser[3:0];
                       last_be_r                     <= #TCQ s_axis_cq_tuser[7:4];
                       s_axis_cq_tready_r            <= #TCQ 1'b0;
+                      
                     end else begin
                       s_axis_cq_tdata_wide_r[127:0] <= #TCQ s_axis_cq_tdata[127:0];
                       first_be_r                    <= #TCQ s_axis_cq_tuser[3:0];
                       saxis_sm <= #TCQ COMPLETION_UR;
                       s_axis_cq_tready_r <= #TCQ 1'b0;
+
                     end
                   end else if (s_axis_cq_tvalid & s_axis_cq_tready[0] & (s_axis_cq_tdata[78:75] == 4'h1)) begin // If Memory Write
-                    if ( s_axis_cq_tdata[10+64:0+64] == 11'd2 || s_axis_cq_tdata[10+64:0+64] == 11'd1) begin       // Only 1DW Writes are Supported
-                    //if ( s_axis_cq_tdata[10+64:0+64] == 11'd1) begin
+                    if ( s_axis_cq_tdata[10+64:0+64] == 11'd2 || s_axis_cq_tdata[10+64:0+64] == 11'd1) begin       // Only 1DW Writes are Supported - This can be enhanced  
                       saxis_sm                      <= #TCQ WRITE_DATA_256;
                       mem_req_write_readn_r         <= #TCQ 1'b1;
                       mem_req_valid_r               <= #TCQ 1'b1; 
                       s_axis_cq_tdata_wide_r[191:0] <= #TCQ s_axis_cq_tdata[191:0]; //2D word
                       first_be_r                    <= #TCQ s_axis_cq_tuser[3:0]; 
                       last_be_r                     <= #TCQ s_axis_cq_tuser[11:8];
-                      s_axis_cq_tready_r            <= #TCQ 1'b0;   
+                      s_axis_cq_tready_r            <= #TCQ 1'b0; 
+
                     end else begin
                       if (s_axis_cq_tlast) begin
                         saxis_sm <= #TCQ IDLE;
+
                       end else begin
                         saxis_sm <= #TCQ WAIT_FOR_LAST;
                       end                    
@@ -371,8 +177,9 @@ module saxis_controller # (
                   end
                 end
                 WAIT_FOR_LAST: begin
-                  if ( s_axis_cq_tlast ) begin
+                  if ( s_axis_cq_tlast) begin
                     saxis_sm <= #TCQ IDLE;
+                    
                   end 
                 end 
                 COMPLETION_UR: begin
@@ -391,10 +198,10 @@ module saxis_controller # (
                   end 
                 end 
                 default: begin  // Fault Recovery
-                   saxis_sm <= #TCQ IDLE;
+                   saxis_sm <= #TCQ IDLE;;
          end
           endcase             
-       end
+       //end
     endgenerate         
          
 
@@ -427,5 +234,6 @@ module saxis_controller # (
   assign   completion_ur_attr           = s_axis_cq_tdata_wide_r[126:124];
   
   assign   s_axis_cq_tready             = {22{s_axis_cq_tready_r}};
+  assign   s1_axis_cq_tready            = s_axis_cq_tready_r;
   
 endmodule

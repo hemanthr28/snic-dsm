@@ -187,9 +187,6 @@ module fpga #
     input  wire         pcie_refclk_p,
     input  wire         pcie_refclk_n,
     input  wire         pcie_rst_n,
-  //input  wire         pcie_refclk1_clk_p,
-  //input  wire         pcie_refclk1_clk_n,
-  //input  wire         pcie_rst_n1,
 
 /*
      * Ethernet: QSFP28
@@ -242,8 +239,6 @@ module fpga #
     output wire         qsfp_1_reset_n,
     output wire         qsfp_1_lp_mode,
     input  wire         qsfp_1_intr_n
-   // inout  wire         qsfp_1_i2c_scl,
-   // inout  wire         qsfp_1_i2c_sda
 );
 
 // PTP configuration
@@ -441,9 +436,6 @@ assign i2c_sda = i2c_sda_t_reg ? 1'bz : i2c_sda_o_reg;
 wire pcie_sys_clk;
 wire pcie_sys_clk_gt;
 
-//wire pcie_sys_clk1;
-//wire pcie_sys_clk_gt1;
-
 IBUFDS_GTE4 #(
     .REFCLK_HROW_CK_SEL(2'b00)
 )
@@ -545,6 +537,8 @@ end
 
 assign pcie_user_reset = pcie_user_reset_reg_2;
 
+/*SNIC-DSM integration logic*/
+
 /*CQ router for zynq and corundum*/
 
 wire [AXIS_PCIE_DATA_WIDTH-1:0]    axis_cq_tdata_zynq;
@@ -554,6 +548,7 @@ wire                               axis_cq_tready_zynq;
 wire [AXIS_PCIE_CQ_USER_WIDTH-1:0] axis_cq_tuser_zynq;
 wire                               axis_cq_tvalid_zynq;
 
+/*_cor indicate Corundum interfaces.*/
 wire [AXIS_PCIE_DATA_WIDTH-1:0]    axis_cq_tdata_cor;
 wire [AXIS_PCIE_KEEP_WIDTH-1:0]    axis_cq_tkeep_cor;
 wire                               axis_cq_tlast_cor;
@@ -637,7 +632,6 @@ assign select[0] = ~select[1];
 wire [1:0] select_rc;
 wire [7:0] req_id;
 wire [7:0] tag_data_temp;
-//wire tag_addr_temp;
 
 pcie_us_axis_rc_demux_mod #(
     .M_COUNT(2),
@@ -676,10 +670,7 @@ assign select_rc[0] = ~select_rc[1];
 zynq_ps zynq_ps_inst(
 
          .clk(pcie_user_clk),
-         .rst(1'b1),
-        
-        //.clk(pl_clk),
-        //.rst(pl_rst),
+         .rst('b1),//(pcie_user_reset), //Using the reset signal, causes the design to fail. This needs to be fixed.
         
         /*PORTS FOR CC/CQ INTERFACES*/
         /*Switch to PCIe master*/
@@ -706,6 +697,11 @@ zynq_ps zynq_ps_inst(
         .s_axis_fpga_cc_tuser(axis_cc_tuser_cor),
         .s_axis_fpga_cc_tvalid(axis_cc_tvalid_cor),
         
+        /*These signals are meant for CC and RQ arbitration.
+          These signals can be used to supress the input of the AXIS 
+          interconnect. We can use these to reduce the arbitration overhead. 
+          But needs a good algorithm.*/
+
         //.S00_ARB_REQ_SUPPRESS_0(),
         //.S01_ARB_REQ_SUPPRESS_0(),
         //.S00_ARB_REQ_SUPPRESS_0(1'b0),
@@ -735,17 +731,6 @@ zynq_ps zynq_ps_inst(
         .s_axis_fpga_rq_tready(axis_rq_tready_cor),
         .s_axis_fpga_rq_tuser(axis_rq_tuser_cor),
         .s_axis_fpga_rq_tvalid(axis_rq_tvalid_cor)
-        
-        //.Op1_0()
-        //RQ interface 
-//        .S00_ARB_REQ_SUPPRESS_0(),
-//        .S01_ARB_REQ_SUPPRESS_1(1'b1),
-//        //CC interface 
-//        .S00_ARB_REQ_SUPPRESS_1(),
-//        .S01_ARB_REQ_SUPPRESS_0(1'b1) 
-        
-        //.tag_data_out_0(tag_data_temp)
-        //.tag_addr_out_0(tag_addr_temp)
         
 );
 
